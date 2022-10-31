@@ -7,6 +7,7 @@ import itertools
 from collections import Counter
 from collections import deque
 
+import time
 import cv2 as cv
 import numpy as np
 import mediapipe as mp
@@ -52,12 +53,24 @@ def main():
 
     use_brect = True
 
+    last_command_time = time.time()
+
     # Camera preparation ###############################################################
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
 
     # Model load #############################################################
+    mp_pose = mp.solutions.pose
+    pose = mp_pose.Pose(
+        static_image_mode=use_static_image_mode,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
+
+    mp_drawing = mp.solutions.drawing_utils
+    mp_drawing_styles = mp.solutions.drawing_styles
+    
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         static_image_mode=use_static_image_mode,
@@ -121,6 +134,8 @@ def main():
         results = hands.process(image)
         image.flags.writeable = True
 
+        results_pose = pose.process(image)
+
         #  ####################################################################
         if results.multi_hand_landmarks is not None:
             for hand_landmarks, handedness in zip(results.multi_hand_landmarks,
@@ -141,6 +156,22 @@ def main():
 
                 # Hand sign classification
                 hand_sign_id = keypoint_classifier(pre_processed_landmark_list)
+
+                ## Motion gesture classification ##
+                motion_gesture = ''
+                if results_pose.pose_landmarks is not None:
+                    mp_drawing.draw_landmarks(
+                    debug_image,
+                    results_pose.pose_landmarks,
+                    mp_pose.POSE_CONNECTIONS,
+                    landmark_drawing_spec=mp_drawing_styles
+                    .get_default_pose_landmarks_style())
+
+                    ############ Motion Project Implementation ###############
+                    motion_gesture = identify_motion_gesture(hand_sign_id, handedness, results_pose)
+                    last_command_time = cooldown_send_command(motion_gesture, last_command_time)
+                    ##########################################################
+
                 if hand_sign_id == 2:  # Point gesture
                     point_history.append(landmark_list[8])
                 else:
@@ -167,9 +198,12 @@ def main():
                     handedness,
                     keypoint_classifier_labels[hand_sign_id],
                     point_history_classifier_labels[most_common_fg_id[0][0]],
+                    motion_gesture
                 )
         else:
             point_history.append([0, 0])
+
+        
 
         debug_image = draw_point_history(debug_image, point_history)
         debug_image = draw_info(debug_image, fps, mode, number)
@@ -180,6 +214,58 @@ def main():
     cap.release()
     cv.destroyAllWindows()
 
+
+############################# MOTION PROJECT IMPLEMENTATION ###########################
+def cooldown_send_command(motion_gesture, last_command_time):
+    cooldown = 5
+    time_now = time.time()
+    if time_now - last_command_time > cooldown and motion_gesture != '':
+        if motion_gesture == 'Ligar Luzes':
+            ##### Function call here
+            pass
+        if motion_gesture == 'Desligar Luzes':
+            ##### Function call here
+            pass
+
+        last_command_time = time_now
+        print(f'Command "{motion_gesture}" sent')
+
+    return last_command_time
+
+def identify_motion_gesture(hand_sign_id, handedness,results_pose):
+    nose = results_pose.pose_landmarks.landmark[10]
+    if handedness.classification[0].label[0:] == 'Left':
+        hand = results_pose.pose_landmarks.landmark[15]
+    else:
+        hand = results_pose.pose_landmarks.landmark[16]
+    
+    # hand_sign_id:
+        # 0 - Open
+        # 1 - Close
+        # 2 - Pointer
+        # 3 - OK
+        # 4 - Thumbs Up
+
+    if is_close(nose, hand):
+        if hand_sign_id == 0: # open
+            return 'Ligar Luzes'
+        if hand_sign_id == 1: # close
+            return 'Desligar Luzes'
+
+    return ''
+
+def is_close(nose, hand):
+    return True
+
+# def is_close(nose, hand):
+#     tolerance = 0.13 # normalized coords
+#     distance = np.linalg.norm((nose.x - hand.x, nose.y - hand.y))
+
+#     if distance < tolerance:
+#         return True
+#     else:
+#         return False
+#######################################################################################
 
 def select_mode(key, mode):
     number = -1
@@ -492,13 +578,13 @@ def draw_bounding_rect(use_brect, image, brect):
 
 
 def draw_info_text(image, brect, handedness, hand_sign_text,
-                   finger_gesture_text):
+                   finger_gesture_text, motion_gesture):
     cv.rectangle(image, (brect[0], brect[1]), (brect[2], brect[1] - 22),
                  (0, 0, 0), -1)
 
     info_text = handedness.classification[0].label[0:]
     if hand_sign_text != "":
-        info_text = info_text + ':' + hand_sign_text
+        info_text = info_text + ':' + hand_sign_text + ':' + motion_gesture
     cv.putText(image, info_text, (brect[0] + 5, brect[1] - 4),
                cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv.LINE_AA)
 
