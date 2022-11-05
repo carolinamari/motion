@@ -259,6 +259,16 @@ def cooldown_send_command(motion_gesture, last_command_time):
         if motion_gesture == 'Diminuir volume':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=volume-down-monkey&announcement=Hello%20monkey'
             requests.get(url)
+
+
+        if motion_gesture == 'Play musica':
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=play-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+            
+
+        if motion_gesture == 'Pausar musica':
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=pause-monkey&announcement=Hello%20monkey'
+            requests.get(url)
             
 
         last_command_time = time_now
@@ -287,16 +297,22 @@ def identify_motion_gesture(hand_sign_id, handedness,results_pose, point_history
             return 'Desligar Luzes'
 
         if hand_sign_id == 2 and point_history == 'Clockwise':
-            return 'Proxima musica'
+            return 'Aumentar volume'
         
         if hand_sign_id == 2 and point_history == 'Counter Clockwise':
+            return 'Diminuir volume'
+        
+        if hand_sign_id == 2 and point_history == 'Slide left':
+            return 'Proxima musica'
+        
+        if hand_sign_id == 2 and point_history == 'Slide right':
             return 'Musica anterior'
 
         if hand_sign_id == 4:
-            return 'Aumentar volume'
+            return 'Play musica'
 
         if hand_sign_id == 5:
-            return 'Diminuir volume'
+            return 'Pausar musica'
 
     return ''
 
