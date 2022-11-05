@@ -16,6 +16,10 @@ from utils import CvFpsCalc
 from model import KeyPointClassifier
 from model import PointHistoryClassifier
 
+import requests
+
+from tokens import ACCESS_TOKEN, SECRET_TOKEN
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -168,8 +172,8 @@ def main():
                     .get_default_pose_landmarks_style())
 
                     ############ Motion Project Implementation ###############
-                    motion_gesture = identify_motion_gesture(hand_sign_id, handedness, results_pose)
-                    last_command_time = cooldown_send_command(motion_gesture, last_command_time)
+                    # motion_gesture = identify_motion_gesture(hand_sign_id, handedness, results_pose)
+                    # last_command_time = cooldown_send_command(motion_gesture, last_command_time)
                     ##########################################################
 
                 if hand_sign_id == 2:  # Point gesture
@@ -200,6 +204,12 @@ def main():
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                     motion_gesture
                 )
+
+                ############ Motion Project Implementation ###############
+                if results_pose.pose_landmarks is not None:
+                    motion_gesture = identify_motion_gesture(hand_sign_id, handedness, results_pose, point_history_classifier_labels[most_common_fg_id[0][0]])
+                    last_command_time = cooldown_send_command(motion_gesture, last_command_time)
+                ##########################################################
         else:
             point_history.append([0, 0])
 
@@ -220,19 +230,43 @@ def cooldown_send_command(motion_gesture, last_command_time):
     cooldown = 5
     time_now = time.time()
     if time_now - last_command_time > cooldown and motion_gesture != '':
+        base_url = 'https://api.voicemonkey.io/trigger?'
         if motion_gesture == 'Ligar Luzes':
             ##### Function call here
-            pass
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=light-on-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+
         if motion_gesture == 'Desligar Luzes':
             ##### Function call here
-            pass
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=light-off-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+
+        if motion_gesture == 'Proxima musica':
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=next-music-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+            
+
+        if motion_gesture == 'Musica anterior':
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=previous-music-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+            
+
+        if motion_gesture == 'Aumentar volume':
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=volume-up-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+            
+
+        if motion_gesture == 'Diminuir volume':
+            url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=volume-down-monkey&announcement=Hello%20monkey'
+            requests.get(url)
+            
 
         last_command_time = time_now
         print(f'Command "{motion_gesture}" sent')
 
     return last_command_time
 
-def identify_motion_gesture(hand_sign_id, handedness,results_pose):
+def identify_motion_gesture(hand_sign_id, handedness,results_pose, point_history):
     nose = results_pose.pose_landmarks.landmark[10]
     if handedness.classification[0].label[0:] == 'Left':
         hand = results_pose.pose_landmarks.landmark[15]
@@ -251,6 +285,18 @@ def identify_motion_gesture(hand_sign_id, handedness,results_pose):
             return 'Ligar Luzes'
         if hand_sign_id == 1: # close
             return 'Desligar Luzes'
+
+        if hand_sign_id == 2 and point_history == 'Clockwise':
+            return 'Proxima musica'
+        
+        if hand_sign_id == 2 and point_history == 'Counter Clockwise':
+            return 'Musica anterior'
+
+        if hand_sign_id == 4:
+            return 'Aumentar volume'
+
+        if hand_sign_id == 5:
+            return 'Diminuir volume'
 
     return ''
 
