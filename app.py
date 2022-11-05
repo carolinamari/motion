@@ -59,6 +59,10 @@ def main():
 
     last_command_time = time.time()
 
+    ############ Motion Project Implementation ###############
+    triggered = False
+    ##########################################################
+
     # Camera preparation ###############################################################
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
@@ -208,7 +212,7 @@ def main():
                 ############ Motion Project Implementation ###############
                 if results_pose.pose_landmarks is not None:
                     motion_gesture = identify_motion_gesture(hand_sign_id, handedness, results_pose, point_history_classifier_labels[most_common_fg_id[0][0]])
-                    last_command_time = cooldown_send_command(motion_gesture, last_command_time)
+                    last_command_time, triggered = cooldown_send_command(motion_gesture,triggered, last_command_time)
                 ##########################################################
         else:
             point_history.append([0, 0])
@@ -226,55 +230,69 @@ def main():
 
 
 ############################# MOTION PROJECT IMPLEMENTATION ###########################
-def cooldown_send_command(motion_gesture, last_command_time):
+def cooldown_send_command(motion_gesture, triggered, last_command_time):
     cooldown = 5
     time_now = time.time()
+    triggered_new_value = triggered
+    
     if time_now - last_command_time > cooldown and motion_gesture != '':
         base_url = 'https://api.voicemonkey.io/trigger?'
-        if motion_gesture == 'Ligar Luzes':
+
+        if motion_gesture == 'Oi':
+            triggered_new_value = True
+
+        if triggered and motion_gesture == 'Ligar Luzes':
             ##### Function call here
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=light-on-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
 
-        if motion_gesture == 'Desligar Luzes':
+        if triggered and motion_gesture == 'Desligar Luzes':
             ##### Function call here
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=light-off-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
 
-        if motion_gesture == 'Proxima musica':
+        if triggered and motion_gesture == 'Proxima musica':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=next-music-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
             
 
-        if motion_gesture == 'Musica anterior':
+        if triggered and motion_gesture == 'Musica anterior':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=previous-music-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
             
 
-        if motion_gesture == 'Aumentar volume':
+        if triggered and motion_gesture == 'Aumentar volume':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=volume-up-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
             
 
-        if motion_gesture == 'Diminuir volume':
+        if triggered and motion_gesture == 'Diminuir volume':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=volume-down-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
 
 
-        if motion_gesture == 'Play musica':
+        if triggered and motion_gesture == 'Play musica':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=play-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
             
 
-        if motion_gesture == 'Pausar musica':
+        if triggered and motion_gesture == 'Pausar musica':
             url = f'{base_url}access_token={ACCESS_TOKEN}&secret_token={SECRET_TOKEN}&monkey=pause-monkey&announcement=Hello%20monkey'
             requests.get(url)
+            triggered_new_value = False
             
 
         last_command_time = time_now
         print(f'Command "{motion_gesture}" sent')
 
-    return last_command_time
+    return last_command_time, triggered_new_value
 
 def identify_motion_gesture(hand_sign_id, handedness,results_pose, point_history):
     nose = results_pose.pose_landmarks.landmark[10]
@@ -313,6 +331,9 @@ def identify_motion_gesture(hand_sign_id, handedness,results_pose, point_history
 
         if hand_sign_id == 5:
             return 'Pausar musica'
+        
+        if hand_sign_id == 6:
+            return 'Oi'
 
     return ''
 
